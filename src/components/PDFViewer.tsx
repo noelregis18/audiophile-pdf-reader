@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/esm/Page/TextLayer.css';
 import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
@@ -24,6 +24,23 @@ const PDFViewer = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // Initialize speech synthesis
+  useEffect(() => {
+    // Make sure speech synthesis is supported
+    if (!('speechSynthesis' in window)) {
+      toast({
+        title: "Error",
+        description: "Text-to-speech is not supported in your browser",
+        variant: "destructive",
+      });
+    }
+    
+    // Clean up speech synthesis when component unmounts
+    return () => {
+      stopSpeech();
+    };
+  }, []);
+
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1);
@@ -31,6 +48,8 @@ const PDFViewer = () => {
       title: "PDF Loaded Successfully",
       description: `${numPages} pages found in document`,
     });
+    // Automatically extract text from the first page when PDF is loaded
+    extractTextFromPage(1);
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -76,6 +95,16 @@ const PDFViewer = () => {
   };
 
   const speakText = (textToSpeak: string) => {
+    if (!textToSpeak || textToSpeak.trim() === '') {
+      toast({
+        title: "No Text Found",
+        description: "No readable text was found on this page",
+        variant: "destructive",
+      });
+      setIsPlaying(false);
+      return;
+    }
+    
     if (speechSynthesis.speaking) {
       speechSynthesis.cancel();
     }
@@ -85,7 +114,13 @@ const PDFViewer = () => {
     utterance.volume = volume;
     speechSynthesisRef.current = utterance;
     
+    // Debug
+    console.log("Speaking text:", textToSpeak.substring(0, 100) + "...");
+    console.log("Speech rate:", rate);
+    console.log("Speech volume:", volume);
+    
     utterance.onend = () => {
+      console.log("Speech ended");
       if (pageNumber < (numPages || 1)) {
         goToNextPage();
       } else {
@@ -96,8 +131,29 @@ const PDFViewer = () => {
         });
       }
     };
+
+    utterance.onerror = (event) => {
+      console.error("Speech synthesis error:", event);
+      toast({
+        title: "Error",
+        description: "Failed to play audio. Please try again.",
+        variant: "destructive",
+      });
+      setIsPlaying(false);
+    };
     
-    speechSynthesis.speak(utterance);
+    // Ensure speech synthesis is available and ready
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.speak(utterance);
+      console.log("Speech synthesis started");
+    } else {
+      toast({
+        title: "Error",
+        description: "Text-to-speech is not supported in your browser",
+        variant: "destructive",
+      });
+      setIsPlaying(false);
+    }
   };
 
   const togglePlayPause = () => {
@@ -111,12 +167,31 @@ const PDFViewer = () => {
     }
     
     if (isPlaying) {
-      speechSynthesis.pause();
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.pause();
+        toast({
+          title: "Paused",
+          description: "Reading paused",
+        });
+      }
     } else {
-      if (speechSynthesis.paused) {
-        speechSynthesis.resume();
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+        toast({
+          title: "Resumed",
+          description: "Reading resumed",
+        });
       } else {
-        extractTextFromPage(pageNumber);
+        // Extract text if we haven't already
+        if (!text || text.trim() === '') {
+          extractTextFromPage(pageNumber);
+        } else {
+          speakText(text);
+        }
+        toast({
+          title: "Started Reading",
+          description: `Reading page ${pageNumber} of ${numPages}`,
+        });
       }
     }
     
@@ -124,8 +199,8 @@ const PDFViewer = () => {
   };
 
   const stopSpeech = () => {
-    if (speechSynthesis.speaking) {
-      speechSynthesis.cancel();
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
     }
     setIsPlaying(false);
   };
@@ -133,17 +208,32 @@ const PDFViewer = () => {
   const goToNextPage = () => {
     if (pageNumber < (numPages || 1)) {
       stopSpeech();
-      setPageNumber(prevPageNumber => prevPageNumber + 1);
-      extractTextFromPage(pageNumber + 1);
+      const nextPage = pageNumber + 1;
+      setPageNumber(nextPage);
+      extractTextFromPage(nextPage);
     }
   };
 
   const goToPrevPage = () => {
     if (pageNumber > 1) {
       stopSpeech();
-      setPageNumber(prevPageNumber => prevPageNumber - 1);
-      extractTextFromPage(pageNumber - 1);
+      const prevPage = pageNumber - 1;
+      setPageNumber(prevPage);
+      extractTextFromPage(prevPage);
     }
+  };
+
+  // Function to test audio playback
+  const testAudio = () => {
+    const testText = "This is a test of the audio system. If you can hear this, the text-to-speech functionality is working correctly.";
+    const utterance = new SpeechSynthesisUtterance(testText);
+    utterance.rate = rate;
+    utterance.volume = volume;
+    window.speechSynthesis.speak(utterance);
+    toast({
+      title: "Testing Audio",
+      description: "Playing test audio message",
+    });
   };
 
   return (
@@ -178,6 +268,14 @@ const PDFViewer = () => {
             className="w-24"
           />
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={testAudio}
+          className="ml-auto"
+        >
+          Test Audio
+        </Button>
       </div>
 
       <div className="flex flex-col items-center space-y-4">
