@@ -1,73 +1,56 @@
-# Welcome to your Lovable project
 
-## Project info
+# Audiophile PDF Reader
 
-**URL**: https://lovable.dev/projects/1df935a7-4256-452b-9727-ce43fe73de85
+## Description
 
-## How can I edit this code?
+Audiophile PDF Reader is a web application that allows users to upload PDF files and have them read aloud using text-to-speech technology. This application provides an accessible way to consume PDF content for people with visual impairments, reading difficulties, or for those who prefer to listen to documents while multitasking.
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- **PDF Viewer**: Upload and view PDF documents with page navigation
+- **Text-to-Speech**: Convert PDF text to speech with adjustable controls
+- **Speed Control**: Customize reading speed from 0.5x to 2x
+- **Volume Control**: Adjust the volume level of the speech
+- **Voice Selection**: Choose from multiple voices (based on browser availability)
+- **Dark/Light Mode**: Switch between theme modes for comfortable viewing
+- **Responsive Design**: Works on desktop and mobile devices
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/1df935a7-4256-452b-9727-ce43fe73de85) and start prompting.
+## Technologies Used
 
-Changes made via Lovable will be committed automatically to this repo.
+- **React**: Frontend framework for building the user interface
+- **TypeScript**: Type-safe programming language
+- **Tailwind CSS**: Utility-first CSS framework for styling
+- **shadcn/ui**: High-quality UI components
+- **react-pdf**: PDF rendering library
+- **Web Speech API**: Browser API for text-to-speech functionality
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Start the development server: `npm run dev`
+4. Access the application at `http://localhost:5173`
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Usage
 
-Follow these steps:
+1. Upload a PDF file using the file input at the top of the page
+2. The PDF will load and display the first page
+3. Click the Play button to start reading the current page
+4. Use the navigation controls to move between pages
+5. Adjust speed and volume using the sliders
+6. Click the "Change Voice" button to cycle through available voices
+7. Use the "Test Audio" button to verify that audio is working correctly
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Browser Compatibility
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+This application works best in modern browsers that support the Web Speech API, including:
+- Google Chrome
+- Microsoft Edge
+- Safari
+- Firefox
 
-# Step 3: Install the necessary dependencies.
-npm i
+Note that voice selection and quality may vary depending on the browser and operating system.
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+---
 
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/1df935a7-4256-452b-9727-ce43fe73de85) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes it is!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+Designed and Developed by Noel Regis

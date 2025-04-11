@@ -25,6 +25,7 @@ const PDFViewer = () => {
   const [voiceIndex, setVoiceIndex] = useState<number>(0);
   const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Initialize speech synthesis
   useEffect(() => {
@@ -64,6 +65,101 @@ const PDFViewer = () => {
       stopSpeech();
     };
   }, []);
+
+  // Effect to update the speech rate when it changes
+  useEffect(() => {
+    if (currentUtteranceRef.current && window.speechSynthesis.speaking) {
+      // We need to restart speech with new rate
+      const currentText = currentUtteranceRef.current.text;
+      const currentPosition = window.speechSynthesis.speaking ? getCurrentSpeechPosition() : 0;
+      
+      // Cancel current speech
+      window.speechSynthesis.cancel();
+      
+      // Create new utterance with updated rate
+      const newUtterance = new SpeechSynthesisUtterance(currentText);
+      newUtterance.rate = rate;
+      newUtterance.volume = volume;
+      
+      if (availableVoices.length > 0) {
+        newUtterance.voice = availableVoices[voiceIndex];
+      }
+      
+      // Setup event handlers
+      setupUtteranceEvents(newUtterance);
+      
+      // Store reference to current utterance
+      currentUtteranceRef.current = newUtterance;
+      
+      // Speak from approximately where we left off
+      if (currentPosition > 0 && currentText.length > currentPosition) {
+        const remainingText = currentText.substring(currentPosition);
+        newUtterance.text = remainingText;
+      }
+      
+      // Speak with new settings
+      window.speechSynthesis.speak(newUtterance);
+      console.log(`Speech rate updated to ${rate}`);
+    }
+  }, [rate]);
+
+  // Effect to update the speech volume when it changes
+  useEffect(() => {
+    if (currentUtteranceRef.current && window.speechSynthesis.speaking) {
+      // For volume, we can update it on the fly without restarting
+      currentUtteranceRef.current.volume = volume;
+      console.log(`Speech volume updated to ${volume}`);
+    }
+  }, [volume]);
+
+  // Helper function to estimate current speech position
+  const getCurrentSpeechPosition = () => {
+    if (!currentUtteranceRef.current) return 0;
+    
+    // This is an approximation since SpeechSynthesis API doesn't provide position
+    const fullText = currentUtteranceRef.current.text;
+    const elapsedTime = Date.now() - (speechStartTimeRef.current || Date.now());
+    const estimatedCharsPerMs = 0.05; // Approximation
+    const estimatedPosition = Math.floor(elapsedTime * estimatedCharsPerMs);
+    
+    return Math.min(estimatedPosition, fullText.length);
+  };
+
+  // Reference to track when speech started
+  const speechStartTimeRef = useRef<number | null>(null);
+
+  // Helper function to set up utterance events
+  const setupUtteranceEvents = (utterance: SpeechSynthesisUtterance) => {
+    utterance.onstart = () => {
+      speechStartTimeRef.current = Date.now();
+      console.log("Speech started");
+    };
+    
+    utterance.onend = () => {
+      console.log("Speech ended");
+      speechStartTimeRef.current = null;
+      if (pageNumber < (numPages || 1)) {
+        goToNextPage();
+      } else {
+        setIsPlaying(false);
+        toast({
+          title: "Reading Complete",
+          description: "Reached the end of the document",
+        });
+      }
+    };
+
+    utterance.onerror = (event) => {
+      console.error("Speech synthesis error:", event);
+      speechStartTimeRef.current = null;
+      toast({
+        title: "Error",
+        description: "Failed to play audio. Please try again.",
+        variant: "destructive",
+      });
+      setIsPlaying(false);
+    };
+  };
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
@@ -143,36 +239,18 @@ const PDFViewer = () => {
       utterance.voice = availableVoices[voiceIndex];
     }
     
+    // Set up utterance events
+    setupUtteranceEvents(utterance);
+    
+    // Store references
     speechSynthesisRef.current = utterance;
+    currentUtteranceRef.current = utterance;
     
     // Debug
     console.log("Speaking text:", textToSpeak.substring(0, 100) + "...");
     console.log("Speech rate:", rate);
     console.log("Speech volume:", volume);
     console.log("Selected voice:", utterance.voice ? utterance.voice.name : "Default voice");
-    
-    utterance.onend = () => {
-      console.log("Speech ended");
-      if (pageNumber < (numPages || 1)) {
-        goToNextPage();
-      } else {
-        setIsPlaying(false);
-        toast({
-          title: "Reading Complete",
-          description: "Reached the end of the document",
-        });
-      }
-    };
-
-    utterance.onerror = (event) => {
-      console.error("Speech synthesis error:", event);
-      toast({
-        title: "Error",
-        description: "Failed to play audio. Please try again.",
-        variant: "destructive",
-      });
-      setIsPlaying(false);
-    };
     
     // Force audio context creation by playing a brief silence
     // This can help overcome browser autoplay restrictions
@@ -319,11 +397,40 @@ const PDFViewer = () => {
     if (window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
     }
+
+    // Set up event handlers for debugging
+    utterance.onstart = () => console.log("Test audio started");
+    utterance.onend = () => console.log("Test audio ended");
+    utterance.onerror = (e) => console.error("Test audio error:", e);
     
     window.speechSynthesis.speak(utterance);
     toast({
       title: "Testing Audio",
       description: "Playing test audio message",
+    });
+  };
+
+  // Handle rate change with immediate feedback
+  const handleRateChange = (value: number[]) => {
+    const newRate = value[0];
+    setRate(newRate);
+    
+    // Provide feedback to user
+    toast({
+      title: "Speed Updated",
+      description: `Reading speed set to ${newRate.toFixed(1)}x`,
+    });
+  };
+
+  // Handle volume change with immediate feedback
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0];
+    setVolume(newVolume);
+    
+    // Provide feedback to user
+    toast({
+      title: "Volume Updated",
+      description: `Volume set to ${Math.round(newVolume * 100)}%`,
     });
   };
 
@@ -343,7 +450,7 @@ const PDFViewer = () => {
             min={0.5}
             max={2}
             step={0.1}
-            onValueChange={([value]) => setRate(value)}
+            onValueChange={handleRateChange}
             className="w-24"
           />
           <span className="text-xs">{rate.toFixed(1)}x</span>
@@ -355,7 +462,7 @@ const PDFViewer = () => {
             min={0}
             max={1}
             step={0.1}
-            onValueChange={([value]) => setVolume(value)}
+            onValueChange={handleVolumeChange}
             className="w-24"
           />
         </div>
