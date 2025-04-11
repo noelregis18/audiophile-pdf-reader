@@ -22,6 +22,8 @@ const PDFViewer = () => {
   const [rate, setRate] = useState<number>(1);
   const [volume, setVolume] = useState<number>(1);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [voiceIndex, setVoiceIndex] = useState<number>(0);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
   const speechSynthesisRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Initialize speech synthesis
@@ -33,6 +35,28 @@ const PDFViewer = () => {
         description: "Text-to-speech is not supported in your browser",
         variant: "destructive",
       });
+      return;
+    }
+    
+    // Initialize available voices
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      console.log("Available voices:", voices);
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+      }
+    };
+
+    // Chrome needs this special handling
+    if (window.speechSynthesis.onvoiceschanged !== undefined) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+    
+    loadVoices();
+    
+    // Check if speech synthesis is already active
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
     }
     
     // Clean up speech synthesis when component unmounts
@@ -105,19 +129,27 @@ const PDFViewer = () => {
       return;
     }
     
-    if (speechSynthesis.speaking) {
-      speechSynthesis.cancel();
+    // Cancel any ongoing speech
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
     }
     
     const utterance = new SpeechSynthesisUtterance(textToSpeak);
     utterance.rate = rate;
     utterance.volume = volume;
+    
+    // Set the voice if available
+    if (availableVoices.length > 0) {
+      utterance.voice = availableVoices[voiceIndex];
+    }
+    
     speechSynthesisRef.current = utterance;
     
     // Debug
     console.log("Speaking text:", textToSpeak.substring(0, 100) + "...");
     console.log("Speech rate:", rate);
     console.log("Speech volume:", volume);
+    console.log("Selected voice:", utterance.voice ? utterance.voice.name : "Default voice");
     
     utterance.onend = () => {
       console.log("Speech ended");
@@ -142,10 +174,39 @@ const PDFViewer = () => {
       setIsPlaying(false);
     };
     
+    // Force audio context creation by playing a brief silence
+    // This can help overcome browser autoplay restrictions
+    const forceAudioContext = () => {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0; // Silent
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start(0);
+      oscillator.stop(0.001);
+    };
+    
+    try {
+      forceAudioContext();
+    } catch (e) {
+      console.log("Audio context setup error (non-critical):", e);
+    }
+    
     // Ensure speech synthesis is available and ready
     if ('speechSynthesis' in window) {
-      window.speechSynthesis.speak(utterance);
-      console.log("Speech synthesis started");
+      try {
+        window.speechSynthesis.speak(utterance);
+        console.log("Speech synthesis started");
+      } catch (error) {
+        console.error("Speech synthesis failed:", error);
+        toast({
+          title: "Error",
+          description: "Failed to start speech synthesis. Please try again.",
+          variant: "destructive",
+        });
+        setIsPlaying(false);
+      }
     } else {
       toast({
         title: "Error",
@@ -199,8 +260,11 @@ const PDFViewer = () => {
   };
 
   const stopSpeech = () => {
-    if (window.speechSynthesis.speaking) {
-      window.speechSynthesis.cancel();
+    if (window.speechSynthesis) {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        console.log("Speech canceled");
+      }
     }
     setIsPlaying(false);
   };
@@ -223,12 +287,39 @@ const PDFViewer = () => {
     }
   };
 
+  const changeVoice = () => {
+    if (availableVoices.length > 0) {
+      const newIndex = (voiceIndex + 1) % availableVoices.length;
+      setVoiceIndex(newIndex);
+      toast({
+        title: "Voice Changed",
+        description: `Now using: ${availableVoices[newIndex].name}`,
+      });
+    } else {
+      toast({
+        title: "No Voices Available",
+        description: "Your browser doesn't provide multiple voices",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Function to test audio playback
   const testAudio = () => {
     const testText = "This is a test of the audio system. If you can hear this, the text-to-speech functionality is working correctly.";
     const utterance = new SpeechSynthesisUtterance(testText);
     utterance.rate = rate;
     utterance.volume = volume;
+    
+    if (availableVoices.length > 0) {
+      utterance.voice = availableVoices[voiceIndex];
+    }
+    
+    // Cancel any ongoing speech
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+    
     window.speechSynthesis.speak(utterance);
     toast({
       title: "Testing Audio",
@@ -268,6 +359,16 @@ const PDFViewer = () => {
             className="w-24"
           />
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={changeVoice}
+          disabled={availableVoices.length <= 1}
+          title="Switch to a different voice"
+          className="hidden sm:inline-flex"
+        >
+          Change Voice
+        </Button>
         <Button 
           variant="outline" 
           size="sm" 
