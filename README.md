@@ -53,4 +53,4 @@ Note that voice selection and quality may vary depending on the browser and oper
 
 ---
 
-Designed and Developed by Noel Regis
+
